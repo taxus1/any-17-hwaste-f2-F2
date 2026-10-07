@@ -9,7 +9,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 /**
- * 业务编号分配器（基础设施层）：CK（盘点单）/ AJ（调账流水）/ WB（入库批次），
+ * 业务编号分配器（基础设施层）：CK（盘点单）/ AJ（调账流水）/ WB（入库批次）/ TP（转移计划），
  * 形如 CK-2026-0001，按「前缀-年份-四位序号」递增，全局唯一。
  *
  * 并发约定：编号「取号 + 落库」必须包在同一把 JVM 锁里（见各仓储适配器的 inLock 用法），
@@ -25,12 +25,14 @@ public class BizNoService {
     private final StockCheckMapper stockCheckMapper;
     private final StockAdjustMapper stockAdjustMapper;
     private final WasteStockMapper wasteStockMapper;
+    private final TransferPlanMapper transferPlanMapper;
 
     public BizNoService(StockCheckMapper stockCheckMapper, StockAdjustMapper stockAdjustMapper,
-                        WasteStockMapper wasteStockMapper) {
+                        WasteStockMapper wasteStockMapper, TransferPlanMapper transferPlanMapper) {
         this.stockCheckMapper = stockCheckMapper;
         this.stockAdjustMapper = stockAdjustMapper;
         this.wasteStockMapper = wasteStockMapper;
+        this.transferPlanMapper = transferPlanMapper;
     }
 
     /** 在指定前缀的锁里执行一段「取号 + 落库」临界区。 */
@@ -60,6 +62,12 @@ public class BizNoService {
     public String nextBatchNo() {
         String prefix = yearPrefix("WB");
         return next(prefix, wasteStockMapper.maxBatchNo(prefix));
+    }
+
+    /** 下一个转移计划编号，形如 TP-2026-0001。 */
+    public String nextPlanNo() {
+        String prefix = yearPrefix("TP");
+        return next(prefix, transferPlanMapper.maxPlanNo(prefix));
     }
 
     private String yearPrefix(String bizPrefix) {
